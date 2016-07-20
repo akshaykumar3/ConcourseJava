@@ -1,3 +1,4 @@
+import Utils.Addition;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
@@ -15,7 +16,6 @@ import io.vertx.ext.web.Router;
 import org.cinchapi.concourse.Concourse;
 
 import java.io.InputStream;
-import java.util.Set;
 import java.util.logging.LogManager;
 
 /**
@@ -45,26 +45,27 @@ public class VertxController extends AbstractVerticle {
         logger.info("Vertx Started");
 
         // This is a GET API. Call this API "/getUrl?key=Hello&record=1"
+        // curl -X GET -H "Content-Type: application/json"  "http://127.0.0.1:8090/getUrl?key=abc&record=1"
         Route getRoute = router.route(HttpMethod.GET, config().getString("get_url"));
         getRoute.handler(routingContext -> {
             HttpServerRequest request = routingContext.request();
             String key = request.params().get("key");
             String recordString = request.params().get("record");
             logger.info("GET call with key = "+key+" and record = "+recordString);
-            String value = "";
+            int sum = -1;
             if(isNullOrEmpty(key) || isNullOrEmpty(recordString)) {
-                value = "Empty key or Record";
                 logger.info("Empty key or Record");
             } else {
                 long record = Long.parseLong(recordString);
-                value = concourse.get(key, record);
+                sum = Addition.INSTANCE.retrive(concourse, key, record);
             }
-            request.response().end(createResponse(value));
+            request.response().end(createResponse(String.valueOf(sum)));
             logger.info("Done with GET call");
         });
 
 
         // This is a POST API. Call this API "/postUrl"
+        // curl -X POST -H "Content-Type: application/json" -d '{"key":"abc", "value1":2, "value2":6, "record":1}' "http://127.0.0.1:8090/postUrl"
         Route postRoute = router.route(HttpMethod.POST, config().getString("post_url"));
         postRoute.handler(routingContext -> {
             HttpServerRequest request = routingContext.request();
@@ -81,18 +82,21 @@ public class VertxController extends AbstractVerticle {
                     String requestBody = body.getString(0, body.length(), "UTF-8");
                     JsonObject jsonRequest = new JsonObject(requestBody);
                     String key = jsonRequest.getString("key");
-                    String value = jsonRequest.getString("value");
-                    String recordString = jsonRequest.getString("record");
+                    int value1 = jsonRequest.getInteger("value1");
+                    int value2 = jsonRequest.getInteger("value2");
+                    long record = jsonRequest.getLong("record");
                     logger.info("POST call with para = "+jsonRequest.toString());
 
                     String response = "";
-                    if(isNullOrEmpty(key) || isNullOrEmpty(value) || isNullOrEmpty(recordString)) {
+                    if(isNullOrEmpty(key)) {
                         response = "Empty Input";
                     } else {
-                        long record = Long.parseLong(recordString);
-//                        concourse.set(key, value, record);
-                        concourse.insert(key, record);
-                        response = "Success";
+                        if(Addition.INSTANCE.add(value1, value2, concourse, key, record)) {
+                            response = "Success";
+                        } else {
+                            response = "Failure";
+                        }
+
                     }
                     request.response().end(createResponse(response));
                     logger.info("Done with POST");
