@@ -1,0 +1,7 @@
+{
+  "server_port": 8080,
+
+  "get_url": "/getUrl",
+  "post_url": "/postUrl"
+}
+
